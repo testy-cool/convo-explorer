@@ -171,10 +171,17 @@ def _chunk_turns(turns: list[Turn], target_chars: int = CHUNK_TARGET_CHARS) -> l
     return chunks
 
 
-def _call_gemini(client, model: str, prompt: str) -> str:
-    """Single Gemini API call."""
-    response = client.models.generate_content(model=model, contents=prompt)
-    return response.text
+def _call_gemini(client, model: str, prompt: str, retries: int = 2) -> str:
+    """Single Gemini API call with retry on empty response."""
+    for attempt in range(retries + 1):
+        response = client.models.generate_content(model=model, contents=prompt)
+        text = response.text or ""
+        if text.strip():
+            return text
+        if attempt < retries:
+            import time
+            time.sleep(2)
+    return text
 
 
 def analyze_single(
