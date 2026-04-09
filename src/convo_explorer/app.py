@@ -689,7 +689,7 @@ def main() -> None:
     parser.add_argument("--open", action="store_true", help="Open in Sublime Text (use with --show or --concat)")
     args = parser.parse_args()
     if args.detail is None:
-        args.detail = "full" if args.deep else ("results" if args.analyze else "text")
+        args.detail = "results" if (args.deep or args.analyze) else "text"
 
 
     if args.list:
