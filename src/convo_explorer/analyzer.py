@@ -171,10 +171,50 @@ def _chunk_turns(turns: list[Turn], target_chars: int = CHUNK_TARGET_CHARS) -> l
     return chunks
 
 
+# Pricing per million tokens
+_PRICING = {
+    "gemini-3.1-pro-preview": {"input": 2.00, "output": 12.00},
+    "gemini-3-flash-preview": {"input": 0.50, "output": 3.00},
+    "gemini-3.1-flash-lite-preview": {"input": 0.25, "output": 1.50},
+}
+
+
+class _CostTracker:
+    def __init__(self):
+        self.calls = []
+
+    def record(self, model: str, input_tokens: int, output_tokens: int):
+        pricing = _PRICING.get(model, {"input": 1.0, "output": 5.0})
+        cost = input_tokens * pricing["input"] / 1_000_000 + output_tokens * pricing["output"] / 1_000_000
+        self.calls.append({"model": model, "input": input_tokens, "output": output_tokens, "cost": cost})
+
+    def summary(self) -> str:
+        total_in = sum(c["input"] for c in self.calls)
+        total_out = sum(c["output"] for c in self.calls)
+        total_cost = sum(c["cost"] for c in self.calls)
+        lines = [f"  API calls: {len(self.calls)}"]
+        for c in self.calls:
+            lines.append(f"    {c['model']:30s}  {c['input']:>8,} in / {c['output']:>6,} out  ${c['cost']:.4f}")
+        lines.append(f"  Total: {total_in:,} in / {total_out:,} out — ${total_cost:.4f}")
+        return "\n".join(lines)
+
+
+# Global tracker, reset per analyze call
+_tracker = _CostTracker()
+
+
+def get_cost_summary() -> str:
+    return _tracker.summary()
+
+
 def _call_gemini(client, model: str, prompt: str, retries: int = 2) -> str:
     """Single Gemini API call with retry on empty response."""
     for attempt in range(retries + 1):
         response = client.models.generate_content(model=model, contents=prompt)
+        # Track usage
+        usage = getattr(response, "usage_metadata", None)
+        if usage:
+            _tracker.record(model, getattr(usage, "prompt_token_count", 0), getattr(usage, "candidates_token_count", 0))
         text = response.text or ""
         if text.strip():
             return text
@@ -191,6 +231,8 @@ def analyze_single(
     on_progress: callable = None,
 ) -> str:
     """Analyze a single conversation with Gemini. Auto-chunks if too large."""
+    global _tracker
+    _tracker = _CostTracker()
     from google import genai
 
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
@@ -230,6 +272,8 @@ def analyze_deep(
     prompt_template: str | None = None,
 ) -> str:
     """Deep sequential analysis: pro for first chunk, flash continues with prior context."""
+    global _tracker
+    _tracker = _CostTracker()
     from google import genai
 
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
@@ -287,6 +331,8 @@ def analyze_multi(
     on_progress: callable = None,
 ) -> str:
     """Analyze multiple conversations. Each tuple is (label, turns)."""
+    global _tracker
+    _tracker = _CostTracker()
     from google import genai
 
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])

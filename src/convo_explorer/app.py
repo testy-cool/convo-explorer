@@ -804,6 +804,8 @@ def main() -> None:
         out_path.write_text(result, encoding="utf-8")
         print(result)
         print(f"\n--- Saved to {out_path} ---")
+        from .analyzer import get_cost_summary
+        print(f"\n--- Cost ---\n{get_cost_summary()}")
         return
 
     app = ConvoExplorer()
