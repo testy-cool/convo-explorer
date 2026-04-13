@@ -185,16 +185,28 @@ class ConvoExplorer(App):
 
         total_convos = 0
         for p in projects:
-            if filter_text and filter_text not in p.display_path.lower() and filter_text not in p.folder_name.lower():
-                continue
+            # Filter conversations by preview/slug/project path
+            if filter_text:
+                matching_convos = [
+                    c for c in p.conversations
+                    if filter_text in (c.preview or "").lower()
+                    or filter_text in (c.slug or "").lower()
+                    or filter_text in (c.uuid or "").lower()
+                ]
+                # Also keep entire project if path matches
+                if not matching_convos and filter_text not in p.display_path.lower() and filter_text not in p.folder_name.lower():
+                    continue
+                convos_to_show = matching_convos or p.conversations
+            else:
+                convos_to_show = p.conversations
 
             short = p.display_path
             if len(short) > 50:
                 short = "..." + short[-47:]
 
-            n = len(p.conversations)
+            n = len(convos_to_show)
             total_convos += n
-            ts = p.conversations[0].timestamp[:10] if p.conversations else ""
+            ts = convos_to_show[0].timestamp[:10] if convos_to_show else ""
             proj_name = Path(p.display_path).name if p.display_path else p.folder_name
             marker = " ★" if self._is_analyzed(analyzed, proj_name) else ""
             project_label = f"{short}  ({n})  {ts}{marker}"
@@ -202,10 +214,10 @@ class ConvoExplorer(App):
             pnode = tree.root.add(
                 project_label,
                 data=NodeData(kind="project", project=p),
-                expand=False,
+                expand=bool(filter_text),
             )
 
-            for c in p.conversations:
+            for c in convos_to_show:
                 cts = c.timestamp[:10] if c.timestamp else "?"
                 name = c.slug or c.uuid[:8]
                 preview = c.preview[:45] if c.preview else ""
