@@ -760,9 +760,9 @@ def main() -> None:
             print("No results found.")
         else:
             for hit in hits:
-                name = hit.meta.slug or hit.meta.uuid[:8]
+                slug_part = f"  {hit.meta.slug}" if hit.meta.slug else ""
                 ts = hit.meta.timestamp[:10] if hit.meta.timestamp else "?"
-                print(f"  {ts}  {name:25s}  turn {hit.turn_index+1:3d} ({hit.role:9s})  {hit.snippet}")
+                print(f"  {ts}  {hit.meta.uuid}{slug_part}  turn {hit.turn_index+1:3d} ({hit.role:9s})  {hit.snippet}")
             print(f"\n{len(hits)} matches found.")
         return
 
