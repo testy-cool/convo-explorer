@@ -745,7 +745,9 @@ def main() -> None:
     parser.add_argument("--list", action="store_true", help="List all projects and conversations")
     parser.add_argument("--show", nargs="+", metavar="ID_OR_PATH", help="Preview conversation (first ~10K words)")
     parser.add_argument("--open", action="store_true", help="Open in Sublime Text (use with --show or --concat)")
-    args = parser.parse_args()
+    parser.add_argument("--resume", nargs=1, metavar="ID_OR_PATH", help="Resume a conversation with claude -r (add extra claude flags after --)")
+    parser.add_argument("--dry-run", action="store_true", help="Print the command instead of running it (use with --resume)")
+    args, remaining = parser.parse_known_args()
     if args.detail is None:
         args.detail = "results" if (args.deep or args.analyze) else "text"
 
@@ -765,6 +767,24 @@ def main() -> None:
                 print(f"  {ts}  {hit.meta.uuid}{slug_part}  turn {hit.turn_index+1:3d} ({hit.role:9s})  {hit.snippet}")
             print(f"\n{len(hits)} matches found.")
         return
+
+    if args.resume:
+        paths = _resolve_args(args.resume)
+        if not paths:
+            return
+        from .parser import get_meta
+        meta = get_meta(paths[0])
+        if not meta:
+            print(f"Error: could not read metadata from {paths[0]}")
+            return
+        # Pass any extra/unknown args straight to claude
+        cmd = ["claude", "-r", meta.uuid] + remaining
+        name = meta.slug or meta.uuid[:8]
+        print(f"Resuming: {name} ({meta.timestamp[:10]})")
+        print(f"  {' '.join(cmd)}")
+        if args.dry_run:
+            return
+        os.execvp("claude", cmd)
 
     if args.list:
         from .scanner import scan_projects
