@@ -12,8 +12,8 @@ dependencies = [
 ai = ["google-genai>=1.0"]
 
 [project.scripts]
-cc-convo-explorer = "convo_explorer.app:main"
-convo-explorer = "convo_explorer.app:main"
+cc-convo-explorer = "cc_convo_explorer.app:main"
+convo-explorer = "cc_convo_explorer.app:main"
 
 [tool.uv]
 package = true
@@ -23,4 +23,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/convo_explorer"]
+packages = ["src/cc_convo_explorer"]
