@@ -93,7 +93,7 @@ class ConvoExplorer(App):
         Binding("r", "resume", "Resume in Claude", priority=False),
     ]
 
-    TITLE = "convo-explorer"
+    TITLE = "cc-convo-explorer"
 
     def __init__(self) -> None:
         super().__init__()
@@ -114,7 +114,7 @@ class ConvoExplorer(App):
         yield Header()
         with Horizontal(id="main"):
             with Vertical(id="sidebar"):
-                yield Input(placeholder="Type to filter...", id="filter-input")
+                yield Input(placeholder="Filter convos...  (/ for deep search)", id="filter-input")
                 yield Static("PROJECTS", classes="panel-title", id="left-title")
                 yield Tree("Conversations", id="nav-tree")
             yield Static("┃", id="resize-handle")
@@ -244,7 +244,7 @@ class ConvoExplorer(App):
             f"PROJECTS ({shown})  ·  S=select  Ctrl+A=all"
         )
         self.query_one("#status-bar", Static).update(
-            f" {shown} projects · {total_convos} conversations · Tab switch · S multi-select · A analyze · E export"
+            f" {shown} projects · {total_convos} conversations · / search · S select · Tab switch · A analyze · E export"
         )
 
     def _refresh_analyzed_markers(self) -> None:
@@ -300,6 +300,19 @@ class ConvoExplorer(App):
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "filter-input":
             self._populate_tree(self.projects, filter_text=event.value.lower().strip())
+            # Auto-preview if filter narrows to exactly 1 conversation
+            tree = self.query_one("#nav-tree", Tree)
+            all_convos = [
+                cnode for pnode in tree.root.children
+                for cnode in pnode.children
+                if cnode.data and cnode.data.kind == "convo"
+            ]
+            if len(all_convos) == 1:
+                node = all_convos[0]
+                tree.select_node(node)
+                if node.data.meta:
+                    self.current_meta = node.data.meta
+                    self.load_preview(node.data.meta)
 
     # --- Multi-select ---
 
@@ -503,8 +516,9 @@ class ConvoExplorer(App):
         ts = meta.timestamp[:10] if meta.timestamp else "export"
         out_path = out_dir / f"{name}_{ts}.md"
         out_path.write_text(md, encoding="utf-8")
-        self.call_from_thread(self.notify, f"Exported to {out_path}")
+        self.call_from_thread(self.notify, f"Exported to {out_path.resolve()}")
         self._last_action = "export"
+        self._last_export_dir = out_dir.resolve()
 
     @work(thread=True)
     def do_export_multi(self, nodes: list[NodeData]) -> None:
@@ -518,8 +532,9 @@ class ConvoExplorer(App):
             ts = meta.timestamp[:10] if meta.timestamp else "export"
             out_path = out_dir / f"{name}_{ts}.md"
             out_path.write_text(md, encoding="utf-8")
-        self.call_from_thread(self.notify, f"Exported {len(nodes)} conversations to output/")
+        self.call_from_thread(self.notify, f"Exported {len(nodes)} conversations to {out_dir.resolve()}/")
         self._last_action = "export"
+        self._last_export_dir = out_dir.resolve()
 
     def action_export_concat(self) -> None:
         selected = self._get_selected_nodes()
@@ -548,8 +563,9 @@ class ConvoExplorer(App):
         proj = Path(first_meta.cwd).name if first_meta and first_meta.cwd else "mixed"
         out_path = out_dir / f"{ts}-{proj}-{len(nodes)}-convos-combined.md"
         out_path.write_text(combined, encoding="utf-8")
-        self.call_from_thread(self.notify, f"Combined export: {out_path}")
+        self.call_from_thread(self.notify, f"Combined export: {out_path.resolve()}")
         self._last_action = "export"
+        self._last_export_dir = out_dir.resolve()
         self.call_from_thread(self._set_preview, f"## Exported {len(nodes)} conversations\n\nSaved to `{out_path}`\n\nSize: {len(combined):,} chars (~{len(combined)//4:,} tokens)", 0)
 
     def action_open_folder(self) -> None:
@@ -558,7 +574,7 @@ class ConvoExplorer(App):
         if self._last_action == "analysis":
             folder = ANALYSES_DIR
         elif self._last_action == "export":
-            folder = ANALYSES_DIR.parent / "exports"
+            folder = getattr(self, "_last_export_dir", ANALYSES_DIR.parent / "exports")
         else:
             folder = ANALYSES_DIR.parent  # show both
         folder.mkdir(parents=True, exist_ok=True)
@@ -726,7 +742,18 @@ class ConvoExplorer(App):
         search_input.focus()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        if event.input.id == "search-input" and event.value.strip():
+        if event.input.id == "filter-input":
+            # Enter in filter jumps to first visible conversation
+            tree = self.query_one("#nav-tree", Tree)
+            for pnode in tree.root.children:
+                for cnode in pnode.children:
+                    if cnode.data and cnode.data.kind == "convo" and cnode.data.meta:
+                        tree.select_node(cnode)
+                        self.current_meta = cnode.data.meta
+                        self.load_preview(cnode.data.meta)
+                        tree.focus()
+                        return
+        elif event.input.id == "search-input" and event.value.strip():
             self.do_search(event.value.strip())
 
     @work(thread=True)
