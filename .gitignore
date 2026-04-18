@@ -16,3 +16,4 @@ output/
 analyses/
 .env
 .remember/
+.DS_Store

@@ -73,7 +73,6 @@ class ConvoExplorer(App):
     #prompt-panel { height: 1fr; }
     #prompt-bar { dock: bottom; height: 3; }
     #prompt-bar Button { width: 1fr; margin: 0 1; }
-    #search-input { dock: top; display: none; }
     """
 
     BINDINGS = [
@@ -89,7 +88,7 @@ class ConvoExplorer(App):
         Binding("p", "edit_prompt", "Edit prompt", priority=False),
         Binding("o", "open_folder", "Open folder", priority=False),
         Binding("escape", "cancel", "Cancel", priority=True),
-        Binding("slash", "search", "Search content", priority=False),
+        Binding("slash", "search", "Search", priority=False),
         Binding("r", "resume", "Resume in Claude", priority=False),
     ]
 
@@ -114,13 +113,12 @@ class ConvoExplorer(App):
         yield Header()
         with Horizontal(id="main"):
             with Vertical(id="sidebar"):
-                yield Input(placeholder="Filter convos...  (/ for deep search)", id="filter-input")
+                yield Input(placeholder="Filter convos...  (Enter for deep search)", id="filter-input")
                 yield Static("PROJECTS", classes="panel-title", id="left-title")
                 yield Tree("Conversations", id="nav-tree")
             yield Static("┃", id="resize-handle")
             with Vertical(id="content"):
                 yield Static("PREVIEW", classes="panel-title", id="right-title")
-                yield Input(placeholder="Search all conversations... (Enter to search, Esc to close)", id="search-input")
                 with VerticalScroll(id="preview-scroll"):
                     yield Markdown("*Select a project, then a conversation*", id="preview")
                 with Vertical(id="prompt-panel"):
@@ -732,28 +730,12 @@ class ConvoExplorer(App):
     # --- Search ---
 
     def action_search(self) -> None:
-        search_input = self.query_one("#search-input", Input)
-        if search_input.display:
-            search_input.display = False
-            self.query_one("#nav-tree", Tree).focus()
-            return
-        search_input.display = True
-        search_input.value = ""
-        search_input.focus()
+        filt = self.query_one("#filter-input", Input)
+        filt.focus()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        if event.input.id == "filter-input":
-            # Enter in filter jumps to first visible conversation
-            tree = self.query_one("#nav-tree", Tree)
-            for pnode in tree.root.children:
-                for cnode in pnode.children:
-                    if cnode.data and cnode.data.kind == "convo" and cnode.data.meta:
-                        tree.select_node(cnode)
-                        self.current_meta = cnode.data.meta
-                        self.load_preview(cnode.data.meta)
-                        tree.focus()
-                        return
-        elif event.input.id == "search-input" and event.value.strip():
+        if event.input.id == "filter-input" and event.value.strip():
+            # Enter in filter: deep search across all conversation content
             self.do_search(event.value.strip())
 
     @work(thread=True)
@@ -786,16 +768,11 @@ class ConvoExplorer(App):
         if self._analyzing:
             self._cancel_analysis()
         else:
-            # Close search if open
-            search_input = self.query_one("#search-input", Input)
-            if search_input.display:
-                search_input.display = False
-                self.query_one("#nav-tree", Tree).focus()
-                return
-            # Clear filter if active
+            # Clear filter and return to tree
             filt = self.query_one("#filter-input", Input)
             if filt.value:
                 filt.value = ""
+            self.query_one("#nav-tree", Tree).focus()
 
     def action_quit(self) -> None:
         self.exit()

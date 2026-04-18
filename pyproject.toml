@@ -13,7 +13,6 @@ ai = ["google-genai>=1.0"]
 
 [project.scripts]
 cc-convo-explorer = "cc_convo_explorer.app:main"
-convo-explorer = "cc_convo_explorer.app:main"
 
 [tool.uv]
 package = true

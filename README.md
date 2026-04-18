@@ -1,29 +1,28 @@
-# convo-explorer
+# cc-convo-explorer
 
-A terminal UI for browsing, searching, exporting, and analyzing your [Claude Code](https://docs.anthropic.com/en/docs/claude-code) conversation history.
+A terminal UI for browsing, searching, resuming, and analyzing your [Claude Code](https://docs.anthropic.com/en/docs/claude-code) conversation history.
 
 Claude Code stores every session as `.jsonl` files in `~/.claude/projects/`. This tool gives you a searchable, interactive interface to explore them all — across every project you've ever worked on.
 
 ## Screenshot
 
 ```
- convo-explorer
- ┌─ PROJECTS (49) ─────────────────┐┌─ PREVIEW (25 turns) ──────────────────────┐
- │ Filter...                        ││                                            │
+ cc-convo-explorer
+ ┌─ PROJECTS (12) ────────────────┐┌─ PREVIEW (25 turns) ──────────────────────┐
+ │ Filter convos... (Enter=search) ││                                            │
  │                                  ││ ## ticklish-twirling-hejlsberg             │
- │ F:\code\ailookup      (12) ★    ││ Date: 2026-04-06T21:11:48                  │
- │ F:\code\testycool      (36)     ││ CWD: F:\code\convo-explorer                │
- │ F:\code\store-scraper (116) ★   ││ ──────────────────────────────────────────  │
- │ F:\code\taskbartimer    (6)     ││ ## User                                    │
- │ ✓ F:\code\my-project   (24)     ││ would like to make this more profesh...    │
- │ ✓ F:\code\another       (8)     ││                                            │
+ │ ~/Work/my-project      (12) ★  ││ Date: 2026-04-06T21:11:48                  │
+ │ ~/Work/web-app          (36)    ││ CWD: ~/Work/my-project                     │
+ │ ~/Work/api-server      (116) ★ ││ ──────────────────────────────────────────  │
+ │ ~/Work/cli-tool          (6)    ││ ## User                                    │
+ │ ✓ ~/Work/dashboard      (24)    ││ would like to make this more profesh...    │
+ │ ✓ ~/Work/shared-lib      (8)    ││                                            │
  │   2026-04-05  fix-auth  ...     ││ ## Assistant                               │
  │   2026-04-03  refactor  ...     ││ Let me explore the codebase first...       │
  │                                  ││                                            │
  ├──────────────────────────────────┤│                                            │
  │ 2 selected · ~850K tokens       ││                                            │
- │ S=select A=analyze E=export     ││                                            │
- │ C=combined M=model O=open       ││                                            │
+ │ / search · S select · A analyze ││                                            │
  └──────────────────────────────────┘└────────────────────────────────────────────┘
 ```
 
@@ -31,87 +30,90 @@ Claude Code stores every session as `.jsonl` files in `~/.claude/projects/`. Thi
 
 - **Browse all projects** — auto-discovers every Claude Code project in `~/.claude/projects/`
 - **Tree view** — expandable project nodes with conversation children, sorted by date
-- **Search/filter** — type to filter projects or conversations instantly
+- **Search/filter** — type to filter instantly, press Enter for deep full-text search
+- **Resume sessions** — press `R` to resume any conversation with `claude -r`
 - **Preview** — select any conversation to see the full user/assistant exchange
 - **Multi-select** — select individual conversations, entire projects, or everything
 - **Token estimation** — see estimated token count for selected conversations
 - **Export** — export individual conversations or combined multi-conversation markdown
 - **Gemini analysis** (optional) — analyze conversations with Google Gemini to extract patterns, preferences, and insights
-- **Model picker** — cycle between `gemini-3-flash-preview`, `gemini-3.1-flash-lite-preview`, `gemini-3.1-pro-preview`
+- **Model picker** — cycle between Gemini models
 - **Editable prompts** — customize the analysis prompt before running
 - **Analyzed indicators** — projects that have been analyzed show a ★ marker
 - **Resizable sidebar** — drag the divider to resize
-- **CLI mode** — list, export, and analyze without the TUI
+- **CLI mode** — list, search, export, resume, and analyze without the TUI
 
 ## Install
 
 ```bash
-# Clone
-git clone https://github.com/voidxd/convo-explorer.git
-cd convo-explorer
+# Install globally (recommended)
+uv tool install "cc-convo-explorer[ai] @ git+https://github.com/testy-cool/cc-convo-explorer.git"
 
-# Install (requires Python 3.13+ and uv)
-uv sync
-
-# Optional: enable Gemini analysis
+# Or clone and install locally
+git clone https://github.com/testy-cool/cc-convo-explorer.git
+cd cc-convo-explorer
 uv sync --extra ai
 ```
+
+Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 
 ## Usage
 
 ### TUI (interactive)
 
 ```bash
-uv run convo-explorer
+cc-convo-explorer
 ```
 
 **Keyboard shortcuts:**
 
 | Key | Action |
 |-----|--------|
+| `/` | Focus search/filter |
+| `Enter` | Deep search (in filter) / Preview conversation (in tree) |
+| `Esc` | Clear filter / Cancel analysis |
 | `S` | Toggle select on current item |
 | `Ctrl+A` | Select all |
 | `Ctrl+D` | Deselect all |
-| `Enter` | Preview conversation |
+| `R` | Resume conversation in Claude Code |
 | `E` | Export selected as individual markdown files |
 | `C` | Export selected as one combined markdown file |
 | `A` | Analyze with Gemini |
 | `M` | Cycle Gemini model |
 | `P` | Edit analysis prompt |
 | `O` | Open exports/analyses folder |
-| `Esc` | Cancel running analysis |
 | `Tab` | Switch focus between sidebar and preview |
 | `Q` | Quit |
 
 ### CLI (headless)
 
 ```bash
-# List all projects and conversations (shows UUIDs and slugs)
-uv run convo-explorer --list
+# List all projects and conversations
+cc-convo-explorer --list
 
-# Export by file path
-uv run convo-explorer --concat path/to/session.jsonl
+# Search across all conversations
+cc-convo-explorer --search "auth middleware"
 
-# Export by UUID prefix (just enough chars to be unique)
-uv run convo-explorer --concat 315ce500
+# Resume a conversation by slug or UUID
+cc-convo-explorer --resume reflective-herding-biscuit
 
-# Export by conversation slug
-uv run convo-explorer --concat reflective-herding-biscuit
+# Export by file path, UUID prefix, or slug
+cc-convo-explorer --concat path/to/session.jsonl
+cc-convo-explorer --concat 315ce500
+cc-convo-explorer --concat reflective-herding-biscuit
 
-# Mix IDs and paths, analyze multiple at once
+# Analyze with Gemini
 export GEMINI_API_KEY=your-key-here
-uv run convo-explorer --analyze 315ce5 reflective-herding --model gemini-3.1-pro-preview
+cc-convo-explorer --analyze 315ce5 reflective-herding --model gemini-3.1-pro-preview
 
-# Custom analysis prompt (inline)
-uv run convo-explorer --analyze 315ce5 --prompt "List all tools used.\n\n{content}"
-
-# Custom analysis prompt (from file)
-uv run convo-explorer --analyze 315ce5 --prompt my-prompt.txt
+# Custom analysis prompt (inline or from file)
+cc-convo-explorer --analyze 315ce5 --prompt "List all tools used.\n\n{content}"
+cc-convo-explorer --analyze 315ce5 --prompt my-prompt.txt
 
 # Detail levels: text (default), tools, results, full
-uv run convo-explorer --concat 315ce5 --detail tools     # +tool call summaries
-uv run convo-explorer --concat 315ce5 --detail results   # +truncated tool output
-uv run convo-explorer --concat 315ce5 --detail full       # +everything untruncated
+cc-convo-explorer --concat 315ce5 --detail tools     # +tool call summaries
+cc-convo-explorer --concat 315ce5 --detail results   # +truncated tool output
+cc-convo-explorer --concat 315ce5 --detail full      # +everything untruncated
 ```
 
 #### Detail levels
@@ -123,43 +125,32 @@ uv run convo-explorer --concat 315ce5 --detail full       # +everything untrunca
 | `results` | + truncated tool output (500 chars each) | +80-100% |
 | `full` | + full untruncated tool output | +300-2000% |
 
-Exports also include a stats header: model, token count, duration, tool calls, and estimated cost.
+Exports include a stats header: model, token count, duration, tool calls, and estimated cost.
 
 ## Gemini Analysis
 
-Set your Gemini API key using any of these methods:
+Set your API key:
 
-**Option 1: `.env` file (recommended for Windows)**
 ```bash
-# Create in project directory or ~/.claude/convo-explorer/.env
+# Environment variable
+export GEMINI_API_KEY=your-key-here
+
+# Or .env file in project directory
 echo GEMINI_API_KEY=your-key-here > .env
 ```
 
-**Option 2: Environment variable**
-```bash
-# Linux/macOS
-export GEMINI_API_KEY=your-key-here
-
-# Windows (PowerShell)
-$env:GEMINI_API_KEY="your-key-here"
-
-# Windows (CMD)
-set GEMINI_API_KEY=your-key-here
-```
-
-Get a free API key at [aistudio.google.com](https://aistudio.google.com/apikey).
+Get a free key at [aistudio.google.com](https://aistudio.google.com/apikey).
 
 Analysis extracts:
-
 - Key decisions and their rationale
 - User preferences and workflow patterns
 - Problems encountered and solutions
 - Recurring patterns across sessions
 - Unfinished work and TODOs
 
-Results are saved to `~/.claude/convo-explorer/analyses/` with human-readable filenames.
+Results saved to `~/.claude/convo-explorer/analyses/`.
 
-For multi-conversation analysis, select multiple items and press `A` — Gemini will find cross-session patterns and preference evolution.
+For multi-conversation analysis, select multiple items and press `A` — Gemini finds cross-session patterns and preference evolution.
 
 ## File locations
 
@@ -168,13 +159,6 @@ For multi-conversation analysis, select multiple items and press `A` — Gemini 
 | Conversation logs | `~/.claude/projects/{project}/*.jsonl` |
 | Analyses | `~/.claude/convo-explorer/analyses/` |
 | Combined exports | `~/.claude/convo-explorer/exports/` |
-
-## Requirements
-
-- Python 3.13+
-- [uv](https://docs.astral.sh/uv/) package manager
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (for conversation data)
-- Google Gemini API key (optional, for analysis features)
 
 ## License
 
