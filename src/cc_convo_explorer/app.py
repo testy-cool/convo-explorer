@@ -1125,8 +1125,8 @@ def main() -> None:
 
     if args.summarize:
         from .summarize import summarize_all
-        from .analyzer import _load_env
-        _load_env()
+        from .analyzer import load_env
+        load_env()
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
             print("GEMINI_API_KEY not set. Check .env or environment.")

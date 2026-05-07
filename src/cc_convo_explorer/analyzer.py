@@ -124,7 +124,7 @@ CONVERSATIONS:
 {content}"""
 
 
-def _load_env():
+def load_env():
     """Load GEMINI_API_KEY from .env files if not already set."""
     if os.environ.get("GEMINI_API_KEY"):
         return
@@ -147,7 +147,7 @@ def _load_env():
 
 
 def gemini_available() -> bool:
-    _load_env()
+    load_env()
     return bool(os.environ.get("GEMINI_API_KEY"))
 
 
