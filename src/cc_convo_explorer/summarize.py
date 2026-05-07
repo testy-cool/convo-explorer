@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from datetime import datetime, timezone
 
 from .parser import ConversationMeta, parse_jsonl, DETAIL_TEXT
 
 SUMMARIES_DIR = Path.home() / ".claude" / "convo-explorer" / "summaries"
-MODEL = "gemini-3.1-flash-lite-preview"
+BIFROST_URL = "https://bifrost.voidxd.cloud/v1/chat/completions"
+MODEL = "gemini/gemini-3.1-flash-lite-preview"
+_LLM_KEYS = Path.home() / ".config" / "io.datasette.llm" / "keys.json"
 
 PROMPT = """Summarize this conversation session in one sentence, commit-message style.
 Focus on what was accomplished or decided, based on these final turns.
@@ -51,15 +52,30 @@ def _write_cache(uuid: str, summary: str) -> None:
     (SUMMARIES_DIR / f"{uuid}.json").write_text(json.dumps(data, indent=2))
 
 
-def _call_gemini_flex(prompt: str, api_key: str) -> str:
-    from google import genai
-    client = genai.Client(api_key=api_key)
-    resp = client.models.generate_content(
-        model=MODEL,
-        contents=prompt,
-        config={"service_tier": "flex"},
+def _load_api_key() -> str:
+    if not _LLM_KEYS.exists():
+        raise RuntimeError(f"No llm keys at {_LLM_KEYS}")
+    keys = json.loads(_LLM_KEYS.read_text())
+    key = keys.get("bifrost")
+    if not key:
+        raise RuntimeError("No 'bifrost' key in llm keys.json")
+    return key
+
+
+def _call_bifrost(prompt: str, api_key: str) -> str:
+    import httpx
+    resp = httpx.post(
+        BIFROST_URL,
+        headers={"Authorization": f"Bearer {api_key}"},
+        json={
+            "model": MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 100,
+        },
+        timeout=60,
     )
-    return resp.text.strip().strip('"')
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"].strip().strip('"')
 
 
 def summarize_session(meta: ConversationMeta, api_key: str) -> str:
@@ -67,16 +83,18 @@ def summarize_session(meta: ConversationMeta, api_key: str) -> str:
     if not turns:
         return ""
     content = "\n\n".join(f"**{t.role}**: {t.text}" for t in turns)
-    summary = _call_gemini_flex(PROMPT.format(content=content), api_key)
+    summary = _call_bifrost(PROMPT.format(content=content), api_key)
     _write_cache(meta.uuid, summary)
     return summary
 
 
 def summarize_all(
     projects: list,
-    api_key: str,
+    api_key: str | None = None,
     on_progress: callable | None = None,
 ) -> tuple[int, int]:
+    if not api_key:
+        api_key = _load_api_key()
     done = 0
     total = sum(len(p.conversations) for p in projects)
     skipped = 0

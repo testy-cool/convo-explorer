@@ -29,6 +29,7 @@ name = "cc-convo-explorer"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "httpx" },
     { name = "textual" },
 ]
 
@@ -40,6 +41,7 @@ ai = [
 [package.metadata]
 requires-dist = [
     { name = "google-genai", marker = "extra == 'ai'", specifier = ">=1.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "textual", specifier = ">=3.0" },
 ]
 provides-extras = ["ai"]

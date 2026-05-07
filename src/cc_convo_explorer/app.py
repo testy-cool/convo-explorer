@@ -1180,12 +1180,12 @@ def main() -> None:
         return
 
     if args.summarize:
-        from .summarize import summarize_all
-        from .analyzer import load_env
-        load_env()
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            print("GEMINI_API_KEY not set. Check .env or environment.")
+        from .summarize import summarize_all, _load_api_key
+        from .scanner import scan_projects
+        try:
+            api_key = _load_api_key()
+        except RuntimeError as e:
+            print(f"Error: {e}")
             raise SystemExit(1)
         projects = scan_projects(extra_dirs=_extra_dirs)
 
@@ -1198,7 +1198,7 @@ def main() -> None:
             else:
                 print(f"{status} (cached)", end="\r")
 
-        print(f"Summarizing sessions...")
+        print("Summarizing sessions...")
         done, skipped = summarize_all(projects, api_key, on_progress)
         print(f"\nDone. {done} processed, {skipped} already cached.")
         raise SystemExit(0)
