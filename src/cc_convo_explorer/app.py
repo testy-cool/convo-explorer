@@ -199,6 +199,7 @@ class ConvoExplorer(App):
         Binding("escape", "cancel", "Cancel", priority=True),
         Binding("slash", "search", "Search", priority=False),
         Binding("r", "resume", "Resume in Claude", priority=False),
+        Binding("h", "handoff", "Handoff to new Claude", priority=False),
     ]
 
     TITLE = "cc-convo-explorer"
@@ -217,6 +218,7 @@ class ConvoExplorer(App):
         self._analyzing = False
         self._last_action: str = ""  # "analysis" or "export"
         self._resume_meta: ConversationMeta | None = None  # set when user wants to resume
+        self._handoff_meta: ConversationMeta | None = None  # set when user wants to handoff
         self._search_cache: dict[str, str] = {}  # uuid -> searchable text (last 10 turns)
 
     def compose(self) -> ComposeResult:
@@ -896,6 +898,15 @@ class ConvoExplorer(App):
         self._resume_meta = self.current_meta
         self.exit()
 
+    # --- Handoff ---
+
+    def action_handoff(self) -> None:
+        if not self.current_meta:
+            self.notify("Select a conversation first", severity="warning")
+            return
+        self._handoff_meta = self.current_meta
+        self.exit()
+
     # --- Search ---
 
     def action_search(self) -> None:
@@ -947,6 +958,44 @@ class ConvoExplorer(App):
         self.exit()
 
 
+def _pick_conversation(convos: list, cwd: str):
+    """Show numbered conversation list for interactive selection. Returns meta or None."""
+    from .summarize import load_summaries
+    summaries = load_summaries()
+    print(f"\n{len(convos)} conversations for {cwd}:\n")
+    for i, c in enumerate(convos):
+        ts = c.timestamp[:10] if c.timestamp else "?"
+        name = c.slug or c.uuid[:8]
+        summary = summaries.get(c.uuid, "")
+        preview = summary[:60] if summary else (c.preview or "")[:50]
+        size = c.path.stat().st_size if c.path.exists() else 0
+        tokens = size // 4
+        if tokens >= 1_000_000:
+            tok_str = f"{tokens / 1_000_000:.1f}M"
+        elif tokens >= 1000:
+            tok_str = f"{tokens // 1000}K"
+        else:
+            tok_str = str(tokens)
+        marker = " *" if i == 0 else ""
+        print(f"  [{i + 1}] {ts}  {name:30s}  ~{tok_str:>6s} tok  {preview}{marker}")
+    print(f"\nEnter number [1-{len(convos)}] or press Enter for latest: ", end="", flush=True)
+    try:
+        choice = input().strip()
+    except (EOFError, KeyboardInterrupt):
+        return None
+    if not choice:
+        return convos[0]
+    try:
+        idx = int(choice) - 1
+        if not (0 <= idx < len(convos)):
+            print(f"Invalid choice: {choice}")
+            return None
+        return convos[idx]
+    except ValueError:
+        print(f"Invalid choice: {choice}")
+        return None
+
+
 def main() -> None:
     import argparse
     parser = argparse.ArgumentParser(description="Browse and analyze Claude Code and Codex conversations")
@@ -962,7 +1011,8 @@ def main() -> None:
     parser.add_argument("--open", action="store_true", help="Open in Sublime Text (use with --show or --concat)")
     parser.add_argument("--resume", nargs=1, metavar="ID_OR_PATH", help="Resume a conversation with claude -r (add extra claude flags after --)")
     parser.add_argument("--dry-run", action="store_true", help="Print the command instead of running it (use with --resume)")
-    parser.add_argument("--handoff", action="store_true", help="Export latest CWD conversation and start a new Claude session with it as context")
+    parser.add_argument("--handoff", nargs="?", const="latest", default=None, metavar="select",
+                        help="Export CWD conversation and start new Claude session (add 'select' to pick from list)")
     parser.add_argument("--export-all", metavar="DIR", help="Export every conversation as individual markdown files to DIR")
     parser.add_argument("--projects-dir", nargs="+", metavar="DIR", help="Additional projects directories to scan (e.g. copied from other machines)")
     parser.add_argument("--summarize", action="store_true",
@@ -1016,9 +1066,8 @@ def main() -> None:
             os.chdir(meta.cwd)
         os.execvp("claude", cmd)
 
-    if args.handoff:
+    if args.handoff is not None:
         from .scanner import scan_projects
-        from .summarize import load_summaries
         cwd = os.path.realpath(os.getcwd())
         projects = scan_projects(extra_dirs=_extra_dirs)
         cwd_convos = []
@@ -1029,43 +1078,12 @@ def main() -> None:
             print(f"No conversations found for {cwd}")
             return
         cwd_convos.sort(key=lambda c: c.timestamp or "", reverse=True)
-        if len(cwd_convos) == 1:
-            meta = cwd_convos[0]
-        else:
-            summaries = load_summaries()
-            print(f"\n{len(cwd_convos)} conversations for {cwd}:\n")
-            for i, c in enumerate(cwd_convos):
-                ts = c.timestamp[:10] if c.timestamp else "?"
-                name = c.slug or c.uuid[:8]
-                summary = summaries.get(c.uuid, "")
-                preview = summary[:60] if summary else (c.preview or "")[:50]
-                size = c.path.stat().st_size if c.path.exists() else 0
-                tokens = size // 4
-                if tokens >= 1_000_000:
-                    tok_str = f"{tokens / 1_000_000:.1f}M"
-                elif tokens >= 1000:
-                    tok_str = f"{tokens // 1000}K"
-                else:
-                    tok_str = str(tokens)
-                marker = " *" if i == 0 else ""
-                print(f"  [{i + 1}] {ts}  {name:30s}  ~{tok_str:>6s} tok  {preview}{marker}")
-            print(f"\nEnter number [1-{len(cwd_convos)}] or press Enter for latest: ", end="", flush=True)
-            try:
-                choice = input().strip()
-            except (EOFError, KeyboardInterrupt):
+        if args.handoff == "select" and len(cwd_convos) > 1:
+            meta = _pick_conversation(cwd_convos, cwd)
+            if meta is None:
                 return
-            if not choice:
-                meta = cwd_convos[0]
-            else:
-                try:
-                    idx = int(choice) - 1
-                    if not (0 <= idx < len(cwd_convos)):
-                        print(f"Invalid choice: {choice}")
-                        return
-                    meta = cwd_convos[idx]
-                except ValueError:
-                    print(f"Invalid choice: {choice}")
-                    return
+        else:
+            meta = cwd_convos[0]
         out_dir = Path("output")
         out_dir.mkdir(exist_ok=True)
         turns = parse_jsonl(meta.path, detail=args.detail)
@@ -1265,6 +1283,26 @@ def main() -> None:
         if meta.cwd and os.path.isdir(meta.cwd):
             os.chdir(meta.cwd)
         print(f"  {' '.join(cmd)}")
+        os.execvp("claude", cmd)
+
+    if app._handoff_meta:
+        meta = app._handoff_meta
+        out_dir = Path("output")
+        out_dir.mkdir(exist_ok=True)
+        turns = parse_jsonl(meta.path)
+        stats = get_stats(meta.path)
+        md = to_markdown(turns, stats=stats)
+        filename = _export_filename(meta)
+        out_path = out_dir / filename
+        out_path.write_text(md, encoding="utf-8")
+        name = meta.slug or meta.uuid[:8]
+        print(f"Exported: {name} → {out_path}")
+        message = f"Read the file {out_path.resolve()} for context from our last session, then summarize what we were working on and ask how to continue."
+        cmd = ["claude", "--dangerously-skip-permissions"] + remaining + [message]
+        display = " ".join(cmd[:-1]) + f' "{message}"'
+        print(f"  {display}")
+        if meta.cwd and os.path.isdir(meta.cwd):
+            os.chdir(meta.cwd)
         os.execvp("claude", cmd)
 
 
