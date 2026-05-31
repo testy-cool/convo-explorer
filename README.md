@@ -121,6 +121,15 @@ cc-convo-explorer --analyze 315ce5 --prompt my-prompt.txt
 cc-convo-explorer --concat 315ce5 --detail tools     # +tool call summaries
 cc-convo-explorer --concat 315ce5 --detail results   # +truncated tool output
 cc-convo-explorer --concat 315ce5 --detail full      # +everything untruncated
+
+# Filter by agent and date range
+cc-convo-explorer --list --source codex --after 2026-05-01
+cc-convo-explorer --search "auth" --source claude --before 2026-05-15
+
+# JSON output for piping to other tools
+cc-convo-explorer --list --json
+cc-convo-explorer --list --source codex --json | jq '.projects[].conversations[].uuid'
+cc-convo-explorer --search "middleware" --json | jq '.hits[].snippet'
 ```
 
 #### Detail levels
@@ -158,6 +167,30 @@ Analysis extracts:
 Results saved to `~/.claude/convo-explorer/analyses/`.
 
 For multi-conversation analysis, select multiple items and press `A` — Gemini finds cross-session patterns and preference evolution.
+
+## Library API
+
+Use as a building block in other tools:
+
+```python
+from cc_convo_explorer import scan_projects, parse_jsonl, get_meta, search, get_stats
+
+# Discover all sessions across all agents
+projects = scan_projects()
+
+# Filter by agent and date
+codex_recent = scan_projects(source="codex", after="2026-05-01")
+
+# Parse a session into normalized turns
+turns = parse_jsonl(projects[0].conversations[0].path)
+
+# Search across all conversations
+hits = search([c.path for p in projects for c in p.conversations], "auth middleware")
+
+# Get token/cost stats
+stats = get_stats(projects[0].conversations[0].path)
+print(f"${stats.cost_estimate:.2f}, {stats.tool_calls} tool calls")
+```
 
 ## File locations
 

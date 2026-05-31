@@ -58,8 +58,20 @@ class Project:
     conversations: list[ConversationMeta] = field(default_factory=list)
 
 
-def scan_projects(extra_dirs: list[Path] | None = None) -> list[Project]:
-    """Find all projects and their conversations, sorted by most recent first."""
+def scan_projects(
+    extra_dirs: list[Path] | None = None,
+    source: str | None = None,
+    after: str | None = None,
+    before: str | None = None,
+) -> list[Project]:
+    """Find all projects and their conversations, sorted by most recent first.
+
+    Args:
+        extra_dirs: Additional project directories to scan.
+        source: Filter by agent — "claude", "codex", or "pi".
+        after: Only include conversations after this ISO date (e.g. "2026-05-01").
+        before: Only include conversations before this ISO date.
+    """
     projects: list[Project] = []
 
     # Scan Claude Code projects
@@ -140,6 +152,27 @@ def scan_projects(extra_dirs: list[Path] | None = None) -> list[Project]:
                 display_path=f"[pi] {cwd}",
                 conversations=convos,
             ))
+
+    # Apply source filter
+    if source:
+        projects = [p for p in projects if p.conversations and p.conversations[0].source == source]
+
+    # Apply date filters to conversations within each project
+    if after or before:
+        filtered = []
+        for p in projects:
+            convos = p.conversations
+            if after:
+                convos = [c for c in convos if (c.timestamp or "") >= after]
+            if before:
+                convos = [c for c in convos if (c.timestamp or "") <= before]
+            if convos:
+                filtered.append(Project(
+                    folder_name=p.folder_name,
+                    display_path=p.display_path,
+                    conversations=convos,
+                ))
+        projects = filtered
 
     # Sort projects by most recent conversation
     projects.sort(

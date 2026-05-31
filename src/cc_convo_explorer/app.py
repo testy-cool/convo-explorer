@@ -1134,28 +1134,63 @@ def main() -> None:
     parser.add_argument("--projects-dir", nargs="+", metavar="DIR", help="Additional projects directories to scan (e.g. copied from other machines)")
     parser.add_argument("--summarize", action="store_true",
                         help="Generate missing session summaries via Gemini (cron-friendly)")
+    parser.add_argument("--json", action="store_true",
+                        help="Output machine-readable JSON (use with --list, --search, --show)")
+    parser.add_argument("--source", choices=["claude", "codex", "pi"],
+                        help="Filter by agent source")
+    parser.add_argument("--after", metavar="DATE",
+                        help="Only conversations after this date (YYYY-MM-DD)")
+    parser.add_argument("--before", metavar="DATE",
+                        help="Only conversations before this date (YYYY-MM-DD)")
     args, remaining = parser.parse_known_args()
 
     # Parse extra project dirs
     _extra_dirs = [Path(d) for d in args.projects_dir] if args.projects_dir else None
+    _scan_kwargs = dict(
+        extra_dirs=_extra_dirs,
+        source=args.source,
+        after=args.after,
+        before=args.before,
+    )
     if args.detail is None:
         args.detail = "results" if (args.deep or args.analyze) else "text"
 
 
     if args.search:
         from .scanner import scan_projects
-        projects = scan_projects(extra_dirs=_extra_dirs)
+        projects = scan_projects(**_scan_kwargs)
         all_paths = [c.path for p in projects for c in p.conversations]
-        print(f"Searching {len(all_paths)} conversations for \"{args.search}\"...\n")
         hits = search_conversations(all_paths, args.search)
-        if not hits:
-            print("No results found.")
+        if args.json:
+            import json as _json
+            print(_json.dumps({
+                "query": args.search,
+                "total_searched": len(all_paths),
+                "hits": [
+                    {
+                        "uuid": h.meta.uuid,
+                        "slug": h.meta.slug,
+                        "source": h.meta.source,
+                        "timestamp": h.meta.timestamp,
+                        "cwd": h.meta.cwd,
+                        "file": str(h.meta.path),
+                        "turn_index": h.turn_index,
+                        "role": h.role,
+                        "snippet": h.snippet,
+                    }
+                    for h in hits
+                ],
+            }, indent=2))
         else:
-            for hit in hits:
-                slug_part = f"  {hit.meta.slug}" if hit.meta.slug else ""
-                ts = hit.meta.timestamp[:10] if hit.meta.timestamp else "?"
-                print(f"  {ts}  {hit.meta.uuid}{slug_part}  turn {hit.turn_index+1:3d} ({hit.role:9s})  {hit.snippet}")
-            print(f"\n{len(hits)} matches found.")
+            print(f"Searching {len(all_paths)} conversations for \"{args.search}\"...\n")
+            if not hits:
+                print("No results found.")
+            else:
+                for hit in hits:
+                    slug_part = f"  {hit.meta.slug}" if hit.meta.slug else ""
+                    ts = hit.meta.timestamp[:10] if hit.meta.timestamp else "?"
+                    print(f"  {ts}  {hit.meta.uuid}{slug_part}  turn {hit.turn_index+1:3d} ({hit.role:9s})  {hit.snippet}")
+                print(f"\n{len(hits)} matches found.")
         return
 
     if args.resume:
@@ -1185,7 +1220,7 @@ def main() -> None:
     if args.handoff is not None:
         from .scanner import scan_projects
         cwd = os.path.realpath(os.getcwd())
-        projects = scan_projects(extra_dirs=_extra_dirs)
+        projects = scan_projects(**_scan_kwargs)
         cwd_convos = []
         for p in projects:
             for c in p.conversations:
@@ -1225,20 +1260,52 @@ def main() -> None:
 
     if args.list:
         from .scanner import scan_projects
-        for p in scan_projects(extra_dirs=_extra_dirs):
-            print(f"\n{p.display_path} ({len(p.conversations)} convos)")
-            for c in p.conversations:
-                ts = c.timestamp[:10] if c.timestamp else "?"
-                name = c.slug or c.uuid[:8]
+        projects = scan_projects(**_scan_kwargs)
+        if args.json:
+            import json as _json
+
+            def _convo_dict(c):
                 size = c.path.stat().st_size if c.path.exists() else 0
-                tokens = size // 4
-                if tokens >= 1_000_000:
-                    tok_str = f"{tokens / 1_000_000:.1f}M"
-                elif tokens >= 1000:
-                    tok_str = f"{tokens // 1000}K"
-                else:
-                    tok_str = str(tokens)
-                print(f"  {ts}  {name:30s}  ~{tok_str:>6s} tok  {c.preview[:50]}")
+                return {
+                    "uuid": c.uuid,
+                    "slug": c.slug,
+                    "source": c.source,
+                    "timestamp": c.timestamp,
+                    "cwd": c.cwd,
+                    "preview": c.preview,
+                    "file": str(c.path),
+                    "size_bytes": size,
+                    "estimated_tokens": size // 4,
+                }
+
+            total_convos = sum(len(p.conversations) for p in projects)
+            print(_json.dumps({
+                "total_projects": len(projects),
+                "total_conversations": total_convos,
+                "projects": [
+                    {
+                        "path": p.display_path,
+                        "folder": p.folder_name,
+                        "conversations": [_convo_dict(c) for c in p.conversations],
+                    }
+                    for p in projects
+                ],
+            }, indent=2))
+        else:
+            for p in projects:
+                print(f"\n{p.display_path} ({len(p.conversations)} convos)")
+                for c in p.conversations:
+                    ts = c.timestamp[:10] if c.timestamp else "?"
+                    name = c.slug or c.uuid[:8]
+                    size = c.path.stat().st_size if c.path.exists() else 0
+                    tokens = size // 4
+                    if tokens >= 1_000_000:
+                        tok_str = f"{tokens / 1_000_000:.1f}M"
+                    elif tokens >= 1000:
+                        tok_str = f"{tokens // 1000}K"
+                    else:
+                        tok_str = str(tokens)
+                    print(f"  {ts}  {name:30s}  ~{tok_str:>6s} tok  {c.preview[:50]}")
         return
 
     if args.show:
@@ -1264,7 +1331,7 @@ def main() -> None:
         from .parser import get_meta
         out_dir = Path(args.export_all)
         out_dir.mkdir(parents=True, exist_ok=True)
-        projects = scan_projects(extra_dirs=_extra_dirs)
+        projects = scan_projects(**_scan_kwargs)
         total = 0
         for proj in projects:
             for c in proj.conversations:
@@ -1372,7 +1439,7 @@ def main() -> None:
         except RuntimeError as e:
             print(f"Error: {e}")
             raise SystemExit(1)
-        projects = scan_projects(extra_dirs=_extra_dirs)
+        projects = scan_projects(**_scan_kwargs)
 
         import sys
         is_tty = sys.stdout.isatty()
