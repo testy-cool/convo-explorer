@@ -247,7 +247,7 @@ class ConvoExplorer(App):
         Binding("h", "handoff", "Handoff to new session", priority=False),
     ]
 
-    TITLE = "convolog"
+    TITLE = "agentconvos"
 
     def __init__(self, extra_dirs: list[Path] | None = None) -> None:
         super().__init__()

@@ -1,8 +1,8 @@
-"""convolog: discover, parse, and query AI coding agent conversations.
+"""agentconvos: discover, parse, and query AI coding agent conversations.
 
 Library API — import these directly:
 
-    from convolog import scan_projects, parse_jsonl, get_meta, search
+    from agentconvos import scan_projects, parse_jsonl, get_meta, search
 
 Discovers sessions from Claude Code (~/.claude/projects/),
 Codex (~/.codex/sessions/), and Pi (~/.pi/agent/sessions/).

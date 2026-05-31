@@ -1,13 +1,13 @@
-# convolog
+# agentconvos
 
 Discover, query, and browse AI coding agent conversations. Works with Claude Code, Codex, and Pi.
 
-Use as a **CLI** (`convolog --context --json`), a **Python library** (`from convolog import scan_projects`), or an **interactive TUI** (`convolog`).
+Use as a **CLI** (`agentconvos --context --json`), a **Python library** (`from agentconvos import scan_projects`), or an **interactive TUI** (`agentconvos`).
 
 ## Install
 
 ```bash
-uv tool install "convolog[ai] @ git+https://github.com/testy-cool/convolog.git"
+uv tool install "agentconvos[ai] @ git+https://github.com/testy-cool/agentconvos.git"
 ```
 
 Without Gemini analysis: drop `[ai]`. Requires Python 3.12+.
@@ -17,42 +17,42 @@ Without Gemini analysis: drop `[ai]`. Requires Python 3.12+.
 ### Project context (the fast path)
 
 ```bash
-convolog --last              # most recent conversation for cwd
-convolog --last 3            # last 3
-convolog --context           # last 5 with summaries
-convolog --context --json    # structured, for piping to other tools
+agentconvos --last              # most recent conversation for cwd
+agentconvos --last 3            # last 3
+agentconvos --context           # last 5 with summaries
+agentconvos --context --json    # structured, for piping to other tools
 ```
 
 ### Search
 
 ```bash
-convolog --search "auth middleware"
-convolog --search "auth" --source claude --json
+agentconvos --search "auth middleware"
+agentconvos --search "auth" --source claude --json
 ```
 
 ### List and filter
 
 ```bash
-convolog --list
-convolog --list --source codex --after 2026-05-01 --json
-convolog --list --json | jq '.projects[].conversations[].summary'
+agentconvos --list
+agentconvos --list --source codex --after 2026-05-01 --json
+agentconvos --list --json | jq '.projects[].conversations[].summary'
 ```
 
 ### Resume and handoff
 
 ```bash
-convolog --resume <id>              # resume in native CLI
-convolog --handoff                  # export context, start new session
-convolog --handoff select           # pick from list
-convolog --handoff codex            # latest Codex conversation
+agentconvos --resume <id>              # resume in native CLI
+agentconvos --handoff                  # export context, start new session
+agentconvos --handoff select           # pick from list
+agentconvos --handoff codex            # latest Codex conversation
 ```
 
 ### Export
 
 ```bash
-convolog --concat <id>              # markdown export
-convolog --concat <id> --detail tools    # include tool call summaries
-convolog --concat <id> --detail full     # include everything
+agentconvos --concat <id>              # markdown export
+agentconvos --concat <id> --detail tools    # include tool call summaries
+agentconvos --concat <id> --detail full     # include everything
 ```
 
 ### Analyze with Gemini
@@ -60,9 +60,9 @@ convolog --concat <id> --detail full     # include everything
 Requires `GEMINI_API_KEY` env var or `.env` file. Get a key at [aistudio.google.com](https://aistudio.google.com/apikey).
 
 ```bash
-convolog --analyze <id>
-convolog --analyze <id1> <id2> --model gemini-3.1-pro-preview
-convolog --analyze <id> --prompt "What tools were used most?"
+agentconvos --analyze <id>
+agentconvos --analyze <id1> <id2> --model gemini-3.1-pro-preview
+agentconvos --analyze <id> --prompt "What tools were used most?"
 ```
 
 ### JSON output
@@ -72,7 +72,7 @@ convolog --analyze <id> --prompt "What tools were used most?"
 ## Library API
 
 ```python
-from convolog import scan_projects, parse_jsonl, search, get_meta, get_stats
+from agentconvos import scan_projects, parse_jsonl, search, get_meta, get_stats
 
 # Discover and filter
 projects = scan_projects(source="claude", after="2026-05-01")
@@ -90,7 +90,7 @@ stats = get_stats(projects[0].conversations[0].path)
 ## TUI
 
 ```bash
-convolog
+agentconvos
 ```
 
 Interactive tree grouped by agent (Claude Code, Codex, Pi) with search, multi-select, preview, export, and Gemini analysis.
