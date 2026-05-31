@@ -8,30 +8,30 @@ It auto-discovers Claude Code sessions from `~/.claude/projects/`, Codex session
 
 ```
  cc-convo-explorer
- ┌─ PROJECTS (12) ────────────────┐┌─ PREVIEW (25 turns) ──────────────────────┐
+ ┌─ PROJECTS (618) ───────────────┐┌─ PREVIEW (25 turns) ──────────────────────┐
  │ Filter convos... (Enter=search) ││                                            │
  │                                  ││ ## ticklish-twirling-hejlsberg             │
- │ ~/Work/my-project      (12) ★  ││ Date: 2026-04-06T21:11:48                  │
- │ ~/Work/web-app          (36)    ││ CWD: ~/Work/my-project                     │
- │ ~/Work/api-server      (116) ★ ││ ──────────────────────────────────────────  │
- │ ~/Work/cli-tool          (6)    ││ ## User                                    │
- │ ✓ ~/Work/dashboard      (24)    ││ would like to make this more profesh...    │
- │ ✓ ~/Work/shared-lib      (8)    ││                                            │
- │   2026-04-05  fix-auth  ...     ││ ## Assistant                               │
- │   2026-04-03  refactor  ...     ││ Let me explore the codebase first...       │
+ │ ▼ Claude Code  (580)            ││ Date: 2026-04-06 21:11                     │
+ │   ▼ ~/Work                      ││ CWD: ~/Work/my-project                     │
+ │     ● my-project    (12) ★     ││ ──────────────────────────────────────────  │
+ │     ► web-app       (36)        ││ ## User                                    │
+ │     ► api-server   (116) ★     ││ would like to make this more profesh...    │
+ │     ► cli-tool       (6)        ││                                            │
+ │   ► ~                           ││ ## Assistant                               │
+ │ ► Codex  (23)                   ││ Let me explore the codebase first...       │
+ │ ► Pi  (15)                      ││                                            │
  │                                  ││                                            │
  ├──────────────────────────────────┤│                                            │
- │ 2 selected · ~850K tokens       ││                                            │
- │ / search · S select · A analyze ││                                            │
+ │ 12 projects · 618 conversations ││                                            │
  └──────────────────────────────────┘└────────────────────────────────────────────┘
 ```
 
 ## Features
 
 - **Browse all projects** — auto-discovers Claude Code, Codex, and Pi sessions
-- **Tree view** — expandable project nodes with conversation children, sorted by date
+- **Agent-grouped tree** — top-level nodes per agent (colored), with path groups and projects underneath
 - **Search/filter** — type to filter instantly, press Enter for deep full-text search
-- **Resume sessions** — press `R` to resume Claude Code and Codex conversations with their native CLI
+- **Resume & handoff** — press `R` to resume or `H` to hand off context to a new session (all agents)
 - **Preview** — select any conversation to see the full user/assistant exchange
 - **Multi-select** — select individual conversations, entire projects, or everything
 - **Token estimation** — see estimated token count for selected conversations
@@ -75,7 +75,8 @@ cc-convo-explorer
 | `S` | Toggle select on current item |
 | `Ctrl+A` | Select all |
 | `Ctrl+D` | Deselect all |
-| `R` | Resume conversation in Claude Code or Codex |
+| `R` | Resume conversation (Claude Code, Codex) |
+| `H` | Handoff context to a new session |
 | `E` | Export selected as individual markdown files |
 | `C` | Export selected as one combined markdown file |
 | `A` | Analyze with Gemini |
@@ -97,6 +98,11 @@ cc-convo-explorer --search "auth middleware"
 # Resume a conversation by slug or UUID
 cc-convo-explorer --resume reflective-herding-biscuit
 cc-convo-explorer --resume 019e4488
+
+# Handoff to a new session (exports context, launches new CLI)
+cc-convo-explorer --handoff              # latest conversation in cwd
+cc-convo-explorer --handoff select       # pick from list
+cc-convo-explorer --handoff codex        # latest Codex conversation in cwd
 
 # Export by file path, UUID prefix, or slug
 cc-convo-explorer --concat path/to/session.jsonl
