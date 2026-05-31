@@ -4,6 +4,8 @@ Discover, query, and browse AI coding agent conversations. Works with Claude Cod
 
 Use as a **CLI** (`agentconvos --context --json`), a **Python library** (`from agentconvos import scan_projects`), or an **interactive TUI** (`agentconvos`).
 
+<p align="center"><img src="assets/demo.svg" width="720" alt="agentconvos demo"></p>
+
 ## Install
 
 ```bash
