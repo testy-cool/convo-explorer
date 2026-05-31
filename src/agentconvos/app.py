@@ -1120,7 +1120,7 @@ def main() -> None:
     parser.add_argument("--concat", nargs="+", metavar="ID_OR_PATH", help="Export concatenated markdown (JSONL paths, UUIDs, or slugs)")
     parser.add_argument("--model", choices=MODELS, default=DEFAULT_MODEL, help="Gemini model")
     parser.add_argument("--prompt", metavar="TEXT_OR_FILE", help="Custom analysis prompt (inline text or path to .txt/.md file). Use {content} as placeholder for conversation text, {count} for multi-convo count.")
-    parser.add_argument("--detail", choices=["text", "tools", "results", "full"], default=None, help="Detail level: text, tools, results (default for analyze), full")
+    parser.add_argument("--detail", choices=["text", "tools", "results", "full", "thinking"], default=None, help="Detail level: text, tools, results, full, thinking (text + reasoning blocks)")
     parser.add_argument("--deep", nargs="+", metavar="ID_OR_PATH", help="Deep analysis: Pro for first chunk, Flash continues with context, Pro synthesizes. Uses full detail.")
     parser.add_argument("--search", metavar="QUERY", help="Search all conversations for a string")
     parser.add_argument("--list", action="store_true", help="List all projects and conversations")
@@ -1225,7 +1225,7 @@ def main() -> None:
 
         def _convo_record(c):
             size = c.path.stat().st_size if c.path.exists() else 0
-            return {
+            rec = {
                 "uuid": c.uuid,
                 "slug": c.slug,
                 "source": c.source,
@@ -1235,6 +1235,9 @@ def main() -> None:
                 "size_bytes": size,
                 "estimated_tokens": size // 4,
             }
+            if c.git_branch:
+                rec["git_branch"] = c.git_branch
+            return rec
 
         if args.json:
             print(_json.dumps({
@@ -1334,7 +1337,7 @@ def main() -> None:
 
             def _convo_dict(c):
                 size = c.path.stat().st_size if c.path.exists() else 0
-                return {
+                rec = {
                     "uuid": c.uuid,
                     "slug": c.slug,
                     "source": c.source,
@@ -1346,6 +1349,9 @@ def main() -> None:
                     "size_bytes": size,
                     "estimated_tokens": size // 4,
                 }
+                if c.git_branch:
+                    rec["git_branch"] = c.git_branch
+                return rec
 
             total_convos = sum(len(p.conversations) for p in projects)
             print(_json.dumps({

@@ -54,6 +54,7 @@ class ConversationMeta:
     preview: str  # first user message, truncated
     turn_count: int = 0
     source: str = "claude"  # "claude", "codex", or "pi"
+    git_branch: str = ""
 
 
 def _detect_format(path: Path) -> str:
@@ -113,6 +114,7 @@ def _get_meta_claude(path: Path) -> ConversationMeta | None:
                     timestamp=rec.get("timestamp", ""),
                     cwd=rec.get("cwd", ""),
                     preview=preview,
+                    git_branch=rec.get("gitBranch", ""),
                 )
     except (json.JSONDecodeError, OSError):
         pass
@@ -369,6 +371,7 @@ DETAIL_TEXT = "text"        # user/assistant text only (default, backward compat
 DETAIL_TOOLS = "tools"      # + tool call summaries
 DETAIL_RESULTS = "results"  # + truncated tool results
 DETAIL_FULL = "full"        # + untruncated tool results
+DETAIL_THINKING = "thinking"  # text + thinking/reasoning blocks
 
 RESULT_TRUNCATE = 500  # chars to keep per tool result in "results" mode
 
@@ -446,6 +449,7 @@ def _parse_jsonl_claude(path: Path, detail: str = DETAIL_TEXT) -> list[Turn]:
     include_tools = detail in (DETAIL_TOOLS, DETAIL_RESULTS, DETAIL_FULL)
     include_results = detail in (DETAIL_RESULTS, DETAIL_FULL)
     truncate_results = detail == DETAIL_RESULTS
+    include_thinking = detail == DETAIL_THINKING or detail == DETAIL_FULL
 
     # Two-pass: tool results arrive in user records AFTER the assistant that called them.
     # Pass 1: collect all tool results keyed by tool_use_id.
@@ -511,6 +515,10 @@ def _parse_jsonl_claude(path: Path, detail: str = DETAIL_TEXT) -> list[Turn]:
                     btype = block.get("type", "")
                     if btype == "text":
                         parts.append(block.get("text", ""))
+                    elif btype == "thinking" and include_thinking:
+                        thinking = (block.get("thinking") or "").strip()
+                        if thinking:
+                            parts.append(f"<thinking>\n{thinking}\n</thinking>")
                     elif btype == "tool_use" and include_tools:
                         name = block.get("name", "?")
                         inp = block.get("input", {})
